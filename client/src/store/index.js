@@ -315,11 +315,10 @@ const store = new Vuex.Store({
         needPrep = true;
       }
 
-      calculateCachedPercentage();
       // This try catch and within logic are mainly for handling data doesn't exist issue
       try {
-        var imagedata = await loadFileAndGetData(dataset._id);
-        sourceProxy.setInputData(imagedata);
+        const { imageData } = await loadFileAndGetData(dataset._id);
+        sourceProxy.setInputData(imageData);
         if (needPrep || !state.proxyManager.getViews().length) {
           prepareProxyManager(state.proxyManager);
           state.vtkViews = state.proxyManager.getViews();
@@ -386,11 +385,6 @@ store.watch(
         sessionId
       });
     });
-    // var concurrency = navigator.hardwareConcurrency + 1 || 2;
-    // calculateCachedPercentage();
-    // for (var i = 0; i < concurrency; i++) {
-    //   startReaderWorker();
-    // }
     startReaderWorkerPool();
   }
 );
@@ -429,69 +423,39 @@ function loadFile(id) {
   return { id, fileP: p };
 }
 
-function getData(id, file) {
-  return ReaderFactory.loadFiles([file])
-    .then(readers => readers[0])
-    .then(({ reader }) => {
-      var imageData = reader.getOutputData();
-      const dataRange = imageData
-        .getPointData()
-        .getArray(0)
-        .getRange();
-      datasetCache.set(id, imageData);
-      expandSessionRange(id, dataRange);
-      return imageData;
-    });
+function getData(id, file, webWorker = null) {
+  return new Promise((resolve, reject) => {
+    const fileName = file.name;
+    const io = new FileReader();
+
+    io.onload = function onLoad() {
+      readImageArrayBuffer(webWorker, io.result, fileName)
+        .then(({ webWorker, image }) => {
+          const imageData = convertItkToVtkImage(image, {
+            scalarArrayName: getArrayName(fileName),
+          });
+          const dataRange = imageData
+            .getPointData()
+            .getArray(0)
+            .getRange();
+          datasetCache.set(id, { imageData });
+          expandSessionRange(id, dataRange);
+          resolve({ imageData, webWorker })
+        })
+        .catch(error => reject(error));
+    };
+
+    io.readAsArrayBuffer(file);
+  });
 }
 
 function loadFileAndGetData(id) {
   if (datasetCache.has(id)) {
     return Promise.resolve(datasetCache.get(id));
   }
-  var p = loadFile(id).fileP.then(file => {
-    return getData(id, file);
+  return loadFile(id).fileP.then(file => {
+    return Promise.resolve(getData(id, file));
   });
-  datasetCache.set(id, p);
-  return p;
-}
-
-var calculateCachedPercentage = _.throttle(() => {
-  if (!store.getters.currentExperiment) {
-    return;
-  }
-
-  const currentExpId = store.getters.currentExperiment.id;
-
-  const expDatasets = store.getters.experimentDatasets(currentExpId);
-
-  var percentage =
-    expDatasets.reduce((total, datasetId) => {
-      return total + (datasetCache.has(datasetId) ? 1 : 0);
-    }, 0) / expDatasets.length;
-  store.state.sessionCachedPercentage = percentage;
-}, 500);
-
-async function startReaderWorker() {
-  var data = readDataQueue.shift();
-  if (!data) {
-    return;
-  }
-  if ("status" in data) {
-    const { sessionId } = data;
-    const session = store.state.sessions[sessionId];
-    session.cached = true;
-    store.state.sessionsModifiedTime = new Date().toISOString();
-  } else {
-    var { id, fileP } = data;
-    var file = await fileP;
-    await getData(id, file);
-  }
-  calculateCachedPercentage();
-  if (readDataQueue.length) {
-    setTimeout(() => {
-      startReaderWorker();
-    });
-  }
 }
 
 function getArrayName(filename) {
@@ -512,27 +476,7 @@ function poolFunction(webWorker, taskInfo) {
 
     const { id, fileP } = taskInfo;
     fileP.then(file => {
-      const fileName = file.name;
-      const io = new FileReader();
-
-      io.onload = function onLoad() {
-        readImageArrayBuffer(webWorker, io.result, fileName)
-          .then(({ webWorker, image }) => {
-            const imageData = convertItkToVtkImage(image, {
-              scalarArrayName: getArrayName(fileName),
-            });
-            const dataRange = imageData
-              .getPointData()
-              .getArray(0)
-              .getRange();
-            datasetCache.set(id, imageData);
-            expandSessionRange(id, dataRange);
-            resolve({ imageData, webWorker })
-          })
-          .catch(error => reject(error));
-      };
-
-      io.readAsArrayBuffer(file);
+      resolve(getData(id, file, webWorker));
     });
   });
 }
