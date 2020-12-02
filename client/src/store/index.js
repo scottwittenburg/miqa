@@ -1,3 +1,4 @@
+import Promise from "bluebird";
 import Vue from "vue";
 import Vuex from "vuex";
 import vtkProxyManager from "vtk.js/Sources/Proxy/Core/ProxyManager";
@@ -6,9 +7,15 @@ import _ from "lodash";
 import ReaderFactory from "../utils/ReaderFactory";
 import "../utils/registerReaders";
 
+import readImageArrayBuffer from "itk/readImageArrayBuffer";
+import WorkerPool from "itk/WorkerPool";
+import ITKHelper from 'vtk.js/Sources/Common/DataModel/ITKHelper';
+
 import { proxy } from "../vtk";
 import { getView } from "../vtk/viewManager";
 import girder from "../girder";
+
+const { convertItkToVtkImage } = ITKHelper;
 
 Vue.use(Vuex);
 
@@ -379,11 +386,12 @@ store.watch(
         sessionId
       });
     });
-    var concurrency = navigator.hardwareConcurrency + 1 || 2;
-    calculateCachedPercentage();
-    for (var i = 0; i < concurrency; i++) {
-      startReaderWorker();
-    }
+    // var concurrency = navigator.hardwareConcurrency + 1 || 2;
+    // calculateCachedPercentage();
+    // for (var i = 0; i < concurrency; i++) {
+    //   startReaderWorker();
+    // }
+    startReaderWorkerPool();
   }
 );
 
@@ -484,6 +492,71 @@ async function startReaderWorker() {
       startReaderWorker();
     });
   }
+}
+
+function getArrayName(filename) {
+  const idx = filename.lastIndexOf('.');
+  const name = idx > -1 ? filename.substring(0, idx) : filename;
+  return `Scalars ${name}`;
+}
+
+function poolFunction(webWorker, taskInfo) {
+  return new Promise((resolve, reject) => {
+    if ("status" in taskInfo) {
+      const { sessionId } = taskInfo;
+      const session = store.state.sessions[sessionId];
+      session.cached = true;
+      store.state.sessionsModifiedTime = new Date().toISOString();
+      resolve({ imageData: null, webWorker: null });
+    }
+
+    const { id, fileP } = taskInfo;
+    fileP.then(file => {
+      const fileName = file.name;
+      const io = new FileReader();
+
+      io.onload = function onLoad() {
+        readImageArrayBuffer(webWorker, io.result, fileName)
+          .then(({ webWorker, image }) => {
+            const imageData = convertItkToVtkImage(image, {
+              scalarArrayName: getArrayName(fileName),
+            });
+            const dataRange = imageData
+              .getPointData()
+              .getArray(0)
+              .getRange();
+            datasetCache.set(id, imageData);
+            expandSessionRange(id, dataRange);
+            resolve({ imageData, webWorker })
+          })
+          .catch(error => reject(error));
+      };
+
+      io.readAsArrayBuffer(file);
+    });
+  });
+}
+
+function progressHandler(completed, total) {
+  const percentComplete = completed / total;
+  store.state.sessionCachedPercentage = percentComplete;
+}
+
+function startReaderWorkerPool() {
+  var poolSize = navigator.hardwareConcurrency + 1 || 2;
+  const workerPool = new WorkerPool(poolSize, poolFunction);
+  const taskArgsArray = [];
+
+  readDataQueue.forEach((taskInfo) => {
+    taskArgsArray.push([taskInfo]);
+  });
+
+  console.log(`workerPool kicking off a batch of ${taskArgsArray.length} tasks`);
+  workerPool.runTasks(taskArgsArray, progressHandler)
+    .then((results) => {
+      console.log(`workerPool got ${results.length} results`);
+      workerPool.terminateWorkers();
+    });
 }
 
 function expandSessionRange(datasetId, dataRange) {
