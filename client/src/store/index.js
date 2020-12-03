@@ -9,7 +9,7 @@ import "../utils/registerReaders";
 
 import readImageArrayBuffer from "itk/readImageArrayBuffer";
 import WorkerPool from "itk/WorkerPool";
-import ITKHelper from 'vtk.js/Sources/Common/DataModel/ITKHelper';
+import ITKHelper from "vtk.js/Sources/Common/DataModel/ITKHelper";
 
 import { proxy } from "../vtk";
 import { getView } from "../vtk/viewManager";
@@ -269,8 +269,10 @@ const store = new Vuex.Store({
       state.errorLoadingDataset = false;
       var oldSession = getters.currentSession;
       const newSession = state.sessions[dataset.session];
-      const oldExperiment = getters.currentExperiment ? getters.currentExperiment.id : null;
-      const newExperiment = state.sessions[dataset.session].experiment
+      const oldExperiment = getters.currentExperiment
+        ? getters.currentExperiment.id
+        : null;
+      const newExperiment = state.sessions[dataset.session].experiment;
       var newProxyManager = false;
       if (oldSession !== newSession && state.proxyManager) {
         // If we don't "shrinkProxyManager()" and reinitialize it between
@@ -432,7 +434,7 @@ function getData(id, file, webWorker = null) {
       readImageArrayBuffer(webWorker, io.result, fileName)
         .then(({ webWorker, image }) => {
           const imageData = convertItkToVtkImage(image, {
-            scalarArrayName: getArrayName(fileName),
+            scalarArrayName: getArrayName(fileName)
           });
           const dataRange = imageData
             .getPointData()
@@ -440,7 +442,7 @@ function getData(id, file, webWorker = null) {
             .getRange();
           datasetCache.set(id, { imageData });
           expandSessionRange(id, dataRange);
-          resolve({ imageData, webWorker })
+          resolve({ imageData, webWorker });
         })
         .catch(error => reject(error));
     };
@@ -455,7 +457,7 @@ function loadFileAndGetData(id) {
   }
   return loadFile(id).fileP.then(file => {
     return getData(id, file).then(({ webWorker, imageData }) => {
-      console.log('terminating a non-pooled worker');
+      console.log("terminating a non-pooled worker");
       webWorker.terminate();
       return Promise.resolve({ imageData });
     });
@@ -463,13 +465,13 @@ function loadFileAndGetData(id) {
 }
 
 function getArrayName(filename) {
-  const idx = filename.lastIndexOf('.');
+  const idx = filename.lastIndexOf(".");
   const name = idx > -1 ? filename.substring(0, idx) : filename;
   return `Scalars ${name}`;
 }
 
 function poolFunction(webWorker, taskInfo) {
-  return new Promise((resolve, reject) => {
+  return new Promise(resolve => {
     if ("status" in taskInfo) {
       const { sessionId } = taskInfo;
       const session = store.state.sessions[sessionId];
@@ -495,16 +497,17 @@ function startReaderWorkerPool() {
   const workerPool = new WorkerPool(poolSize, poolFunction);
   const taskArgsArray = [];
 
-  readDataQueue.forEach((taskInfo) => {
+  readDataQueue.forEach(taskInfo => {
     taskArgsArray.push([taskInfo]);
   });
 
-  console.log(`workerPool kicking off a batch of ${taskArgsArray.length} tasks`);
-  workerPool.runTasks(taskArgsArray, progressHandler)
-    .then((results) => {
-      console.log(`workerPool got ${results.length} results`);
-      workerPool.terminateWorkers();
-    });
+  console.log(
+    `workerPool kicking off a batch of ${taskArgsArray.length} tasks`
+  );
+  workerPool.runTasks(taskArgsArray, progressHandler).then(results => {
+    console.log(`workerPool got ${results.length} results`);
+    workerPool.terminateWorkers();
+  });
 }
 
 function expandSessionRange(datasetId, dataRange) {
