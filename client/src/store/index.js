@@ -454,7 +454,11 @@ function loadFileAndGetData(id) {
     return Promise.resolve(datasetCache.get(id));
   }
   return loadFile(id).fileP.then(file => {
-    return Promise.resolve(getData(id, file));
+    return getData(id, file).then(({ webWorker, imageData }) => {
+      console.log('terminating a non-pooled worker');
+      webWorker.terminate();
+      return Promise.resolve({ imageData });
+    });
   });
 }
 
