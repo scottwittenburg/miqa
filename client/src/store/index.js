@@ -23,6 +23,10 @@ const fileCache = new Map();
 const datasetCache = new Map();
 var readDataQueue = [];
 
+const poolSize = navigator.hardwareConcurrency + 1 || 2;
+const workerPool = new WorkerPool(poolSize, poolFunction);
+console.log(`Created WorkerPool of size ${poolSize}`);
+
 const store = new Vuex.Store({
   state: {
     drawer: false,
@@ -493,8 +497,6 @@ function progressHandler(completed, total) {
 }
 
 function startReaderWorkerPool() {
-  var poolSize = navigator.hardwareConcurrency + 1 || 2;
-  const workerPool = new WorkerPool(poolSize, poolFunction);
   const taskArgsArray = [];
 
   readDataQueue.forEach(taskInfo => {
@@ -506,7 +508,6 @@ function startReaderWorkerPool() {
   );
   workerPool.runTasks(taskArgsArray, progressHandler).then(results => {
     console.log(`workerPool got ${results.length} results`);
-    workerPool.terminateWorkers();
   });
 }
 
