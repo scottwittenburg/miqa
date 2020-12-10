@@ -171,10 +171,6 @@ export default {
           :max="sliceDomain.max"
           :step="sliceDomain.step"
           v-model="slice"
-          v-mousetrap="[
-            { bind: keyboardBindings[1], handler: increaseSlice },
-            { bind: keyboardBindings[0], handler: decreaseSlice }
-          ]"
         ></v-slider>
         <div class="slice caption px-2">{{ slice | roundSlice }} mm</div>
       </v-layout>
@@ -187,11 +183,7 @@ export default {
     <v-toolbar class="toolbar" dark flat color="black" max-height="42">
       <div class="indicator body-2" :class="name">{{ displayName }}</div>
       <v-spacer></v-spacer>
-      <v-btn
-        icon
-        @click="toggleFullscreen"
-        v-mousetrap="{ bind: keyboardBindings[2], handler: toggleFullscreen }"
-      >
+      <v-btn icon @click="toggleFullscreen">
         <v-icon v-if="!fullscreen">fullscreen</v-icon>
         <v-icon v-else>fullscreen_exit</v-icon>
       </v-btn>

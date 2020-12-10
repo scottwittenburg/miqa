@@ -251,10 +251,6 @@ export default {
             :max="active.widthDomain.max"
             :step="active.widthDomain.step"
             v-model="active.width"
-            v-mousetrap="[
-              { bind: '=', handler: increaseWindowWidth },
-              { bind: '-', handler: decreaseWindowWidth }
-            ]"
           ></v-slider>
         </v-col>
         <v-col cols="3" class="pb-1 pt-0">
@@ -304,10 +300,6 @@ export default {
             :max="active.levelDomain.max"
             :step="active.levelDomain.step"
             v-model="active.level"
-            v-mousetrap="[
-              { bind: ']', handler: increaseWindowLevel },
-              { bind: '[', handler: decreaseWindowLevel }
-            ]"
           ></v-slider>
         </v-col>
         <v-col cols="3" class="pb-1 pt-0">

@@ -391,17 +391,6 @@ export default {
                     :disabled="!previousDataset"
                     v-on:mousedown="handleMouseDown('back')"
                     v-on:mouseup="handleMouseUp()"
-                    v-mousetrap="{
-                      bind: 'left',
-                      disabled:
-                        !previousDataset || unsavedDialog || loadingDataset,
-                      handler: {
-                        keydown: function() {
-                          handleMouseDown('back');
-                        },
-                        keyup: handleMouseUp
-                      }
-                    }"
                   >
                     <v-icon>keyboard_arrow_left</v-icon>
                   </v-btn>
@@ -420,16 +409,6 @@ export default {
                     :disabled="!nextDataset"
                     v-on:mousedown="handleMouseDown('forward')"
                     v-on:mouseup="handleMouseUp()"
-                    v-mousetrap="{
-                      bind: 'right',
-                      disabled: !nextDataset || unsavedDialog || loadingDataset,
-                      handler: {
-                        keydown: function() {
-                          handleMouseDown('forward');
-                        },
-                        keyup: handleMouseUp
-                      }
-                    }"
                   >
                     <v-icon>chevron_right</v-icon>
                   </v-btn>
@@ -552,10 +531,6 @@ export default {
                           :disabled="noteSegments.length < 1"
                           class="ma-0"
                           v-on="on"
-                          v-mousetrap="{
-                            bind: 'h',
-                            handler: () => (showNotePopup = !showNotePopup)
-                          }"
                           ><v-icon>arrow_drop_up</v-icon></v-btn
                         >
                       </template>
@@ -589,11 +564,6 @@ export default {
                       @input="reviewChanged = true"
                       :value="this.newNote"
                       ref="note"
-                      v-mousetrap="{ bind: 'n', handler: focusNote }"
-                      v-mousetrap.element="{
-                        bind: 'esc',
-                        handler: () => $refs.note.blur()
-                      }"
                     ></v-text-field>
                   </v-col>
                   <v-col cols="1" class="pb-1 pt-0">
@@ -630,10 +600,6 @@ export default {
                         value="bad"
                         color="red"
                         :disabled="!newNote && !note"
-                        v-mousetrap="{
-                          bind: 'b',
-                          handler: () => setRating('bad')
-                        }"
                         >Bad</v-btn
                       >
                       <v-btn
@@ -644,26 +610,8 @@ export default {
                         :disabled="!newNote && !note"
                         ><b>?</b></v-btn
                       >
-                      <v-btn
-                        text
-                        small
-                        value="good"
-                        color="green"
-                        v-mousetrap="{
-                          bind: 'g',
-                          handler: () => setRating('good')
-                        }"
-                        >Good</v-btn
-                      >
-                      <v-btn
-                        text
-                        small
-                        value="usableExtra"
-                        color="light-green"
-                        v-mousetrap="{
-                          bind: 'u',
-                          handler: () => setRating('usableExtra')
-                        }"
+                      <v-btn text small value="good" color="green">Good</v-btn>
+                      <v-btn text small value="usableExtra" color="light-green"
                         >Extra</v-btn
                       >
                     </v-btn-toggle>
@@ -686,7 +634,6 @@ export default {
                       small
                       :disabled="!reviewChanged"
                       @click="save"
-                      v-mousetrap="{ bind: 'alt+s', handler: save }"
                     >
                       Save
                       <v-icon right>save</v-icon>
@@ -716,26 +663,9 @@ export default {
         <v-card-text>Do you want save before continue?</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn
-            text
-            color="primary"
-            @click="unsavedDialogYes"
-            v-mousetrap="{ bind: 'y', handler: el => el.focus() }"
-            >Yes</v-btn
-          >
-          <v-btn
-            text
-            color="primary"
-            @click="unsavedDialogNo"
-            v-mousetrap="{ bind: 'n', handler: el => el.focus() }"
-            >no</v-btn
-          >
-          <v-btn
-            text
-            @click="unsavedDialogCancel"
-            v-mousetrap="{ bind: 'esc', handler: unsavedDialogCancel }"
-            >Cancel</v-btn
-          >
+          <v-btn text color="primary" @click="unsavedDialogYes">Yes</v-btn>
+          <v-btn text color="primary" @click="unsavedDialogNo">no</v-btn>
+          <v-btn text @click="unsavedDialogCancel">Cancel</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
