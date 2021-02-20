@@ -19,6 +19,7 @@ from girder.models.setting import Setting
 from girder.utility.progress import noProgress
 
 from .conversion.csv_to_json import csvContentToJsonObject
+from .conversion.json_to_csv import jsonObjectToCsvContent
 from .setting import fileWritable, tryAddSites
 from .constants import exportpathKey, importpathKey
 from .schema.data_import import schema
@@ -228,12 +229,20 @@ class Session(Resource):
     def dataExport(self, params):
         exportpath = os.path.expanduser(Setting().get(exportpathKey))
         if not fileWritable(exportpath):
-            raise RestException('export json file is not writable', code=500)
-        output = self.getExportJSON()
-        with open(exportpath, 'w') as json_file:
-            json_file.write(output)
+            raise RestException('export file path is not writable', code=500)
 
-    def getExportJSON(self):
+        output = None
+
+        if exportpath.endswith('.csv'):
+            csvStringIO = self.getExportCSV()
+            output = csvStringIO.getvalue()
+        else:
+            output = self.getExportJSON()
+
+        with open(exportpath, 'w') as fd:
+            fd.write(output)
+
+    def getExportJSONObject(self):
         def convertRatingToDecision(rating):
             return {
                 None: 0,
@@ -267,7 +276,13 @@ class Session(Resource):
             scan['decision'] = convertRatingToDecision(session.get('meta', {}).get('rating', None))
             scan['note'] = session.get('meta', {}).get('note', None)
 
-        return json.dumps(original_json_object)
+        return original_json_object
+
+    def getExportJSON(self):
+        return json.dumps(self.getExportJSONObject())
+
+    def getExportCSV(self):
+        return jsonObjectToCsvContent(self.getExportJSONObject())
 
     def findSessionsFolder(self, user=None, create=False):
         collection = Collection().findOne({'name': 'miqa'})
