@@ -170,6 +170,66 @@ const store = new Vuex.Store({
     },
     removeScreenshot(state, screenshot) {
       state.screenshots.splice(state.screenshots.indexOf(screenshot), 1);
+    },
+    addLocalScan(state, localScanData) {
+      console.log('Adding local scan to sessions:');
+      console.log(localScanData);
+      const {files, experimentId, scanType, scanId } = localScanData;
+      if (!experimentId in state.experiments) {
+        state.experimentIds.push(experimentId);
+        state.experiments[experimentId] = {
+          id: experimentId,
+          folderId: null,
+          name: experimentId,
+          index: state.experimentIds.length - 1,
+        };
+        state.experimentIds.push(experimentId);
+        state.experimentSessions[experimentId] = [];
+      }
+
+      const localSessionId = 'NA';
+
+      state.experimentSessions[experimentId].push(localSessionId);
+      state.sessions[localSessionId] = {
+        id: localSessionId,
+        folderId: 'NA',
+        name: `ncanda_${scanType}_v1`,
+        meta: {
+          experimentId,
+          scanId,
+          scanType,
+          experimentNote: '',
+          note: '',
+          rating: '',
+          site: 'ucsd'  // get from current user
+        },
+        numDatasets: files.length,
+        cumulativeRange: [Number.MAX_VALUE, -Number.MAX_VALUE], // [null, null],
+        experiment: experimentId,
+        local: true,
+      };
+
+      state.sessionDatasets[localSessionId] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        let dataset = session.datasets[k];
+        let datasetId = dataset._id;
+
+        state.sessionDatasets[sessionId].push(datasetId);
+        state.datasets[datasetId] = Object.assign({}, dataset);
+        state.datasets[datasetId].session = sessionId;
+        state.datasets[datasetId].index = k;
+        state.datasets[datasetId].previousDataset =
+          k > 0 ? session.datasets[k - 1]._id : null;
+        state.datasets[datasetId].nextDataset =
+          k < session.datasets.length - 1
+            ? session.datasets[k + 1]._id
+            : null;
+        state.datasets[
+          datasetId
+        ].firstDatasetInPreviousSession = firstInPrev;
+      }
+      firstInPrev = session.datasets[0]._id;
     }
   },
   actions: {
@@ -216,7 +276,8 @@ const store = new Vuex.Store({
             meta: Object.assign({}, session.meta),
             numDatasets: session.datasets.length,
             cumulativeRange: [Number.MAX_VALUE, -Number.MAX_VALUE], // [null, null],
-            experiment: experimentId
+            experiment: experimentId,
+            local: false,
           };
 
           state.sessionDatasets[sessionId] = [];

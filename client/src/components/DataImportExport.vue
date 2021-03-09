@@ -1,5 +1,5 @@
 <script>
-import { mapActions } from "vuex";
+import { mapActions, mapMutations } from "vuex";
 
 export default {
   name: "DataImportExport",
@@ -9,7 +9,23 @@ export default {
     importEnabled: false,
     exportEnabled: false,
     importing: false,
-    importDialog: false
+    importDialog: false,
+    loadDialog: false,
+    loading: false,
+    loadFiles: [],
+    localExperimentId: '',
+    localScanId: '',
+    localScanType: '',
+    knownScanTypes: [
+      'dti30b400-v1',
+      'grefieldmap-v1',
+      'grefieldmap-v1',
+      'rsfmri-v1',
+      't2fse-v1',
+      'mprage-v1',
+      'dti6b500pepolar-v1',
+      'dti60b1000-v1'
+    ]
   }),
   async created() {
     var { data: result } = await this.girderRest.get(
@@ -20,6 +36,7 @@ export default {
   },
   methods: {
     ...mapActions(["loadSessions"]),
+    ...mapMutations(["addLocalScan"]),
     async importData() {
       this.importing = true;
       try {
@@ -39,6 +56,20 @@ export default {
         console.error(ex.response);
       }
       this.importDialog = false;
+    },
+    async loadData() {
+      this.loadFiles.forEach((file) => {
+        console.log(`  ${file.name}`);
+      });
+
+      const localScanData = {
+        files: this.loadFiles.map(f => f),
+        experimentId: this.localExperimentId,
+        scanId: this.localScanId,
+        scanType: this.localScanType,
+      };
+
+      this.addLocalScan(localScanData);
     },
     async exportData() {
       await this.girderRest.get("miqa/data/export");
@@ -61,7 +92,18 @@ export default {
       :disabled="!importEnabled"
       >Import</v-btn
     >
-    <v-btn text color="primary" @click="exportData" :disabled="!exportEnabled"
+    <v-btn
+      text
+      color="primary"
+      @click="loadDialog = true"
+      :disabled="!importEnabled">
+      Load
+    </v-btn>
+    <v-btn
+      text
+      color="primary"
+      @click="exportData"
+      :disabled="!exportEnabled"
       >Export</v-btn
     >
     <v-dialog v-model="importDialog" width="500" :persistent="importing">
@@ -80,6 +122,46 @@ export default {
           >
           <v-btn text color="primary" @click="importData" :loading="importing"
             >Import</v-btn
+          >
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+    <v-dialog v-model="loadDialog" width="500" :persistent="loading">
+      <v-card>
+        <v-card-title class="title">
+          Load a scan
+        </v-card-title>
+        <v-card-text>
+          <v-container>
+            <v-row>
+              <v-col cols="12">
+                <v-file-input v-model="loadFiles" chips multiple label="Image files"></v-file-input>
+              </v-col>
+            </v-row>
+            <v-row>
+              <v-col cols="12">
+                <v-text-field v-model="localExperimentId" label="Experiment ID"></v-text-field>
+              </v-col>
+            </v-row>
+            <v-row>
+              <v-col cols="12">
+                <v-text-field v-model="localScanId" label="Scan ID"></v-text-field>
+              </v-col>
+            </v-row>
+            <v-row>
+              <v-col cols="12">
+                <v-select v-model="localScanType" :items="knownScanTypes" label="Scan Type"></v-select>
+              </v-col>
+            </v-row>
+          </v-container>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn text @click="loadDialog = false" :disabled="loading"
+            >Cancel</v-btn
+          >
+          <v-btn text color="primary" @click="loadData" :loading="loading"
+            >Load</v-btn
           >
         </v-card-actions>
       </v-card>
