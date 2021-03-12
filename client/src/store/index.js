@@ -172,64 +172,61 @@ const store = new Vuex.Store({
       state.screenshots.splice(state.screenshots.indexOf(screenshot), 1);
     },
     addLocalScan(state, localScanData) {
-      console.log('Adding local scan to sessions:');
+      console.log("Adding local scan to sessions:");
       console.log(localScanData);
-      const {files, experimentId, scanType, scanId } = localScanData;
-      if (!experimentId in state.experiments) {
-        state.experimentIds.push(experimentId);
+      const { files, experimentId, scanType, scanId } = localScanData;
+      if (!(experimentId in state.experiments)) {
+        state.experimentIds.unshift(experimentId);
         state.experiments[experimentId] = {
           id: experimentId,
           folderId: null,
           name: experimentId,
-          index: state.experimentIds.length - 1,
+          index: state.experimentIds.length - 1
         };
-        state.experimentIds.push(experimentId);
         state.experimentSessions[experimentId] = [];
       }
 
-      const localSessionId = 'NA';
+      const localSessionId = "singleLocalScan";
 
       state.experimentSessions[experimentId].push(localSessionId);
       state.sessions[localSessionId] = {
         id: localSessionId,
-        folderId: 'NA',
-        name: `ncanda_${scanType}_v1`,
+        folderId: "NA",
+        name: `${scanId}_ncanda_${scanType}_v1`,
         meta: {
           experimentId,
           scanId,
           scanType,
-          experimentNote: '',
-          note: '',
-          rating: '',
-          site: 'ucsd'  // get from current user
+          experimentNote: "",
+          note: "",
+          rating: "",
+          site: "ucsd" // get from current user
         },
         numDatasets: files.length,
         cumulativeRange: [Number.MAX_VALUE, -Number.MAX_VALUE], // [null, null],
         experiment: experimentId,
-        local: true,
+        local: true
       };
 
       state.sessionDatasets[localSessionId] = [];
 
       for (let i = 0; i < files.length; i++) {
-        let dataset = session.datasets[k];
-        let datasetId = dataset._id;
+        const datasetId = `local_${i}`;
+        const dataset = {
+          _id: datasetId,
+          local: true,
+          file: files[i],
+          session: localSessionId,
+          index: i,
+          previousDataset: i <= 0 ? null : `local_${i - 1}`,
+          nextDataset: i >= files.length - 1 ? null : `local_${i + 1}`,
+          firstDatasetInPreviousSession: null,
+          firstDatasetInNextSession: null
+        };
 
-        state.sessionDatasets[sessionId].push(datasetId);
-        state.datasets[datasetId] = Object.assign({}, dataset);
-        state.datasets[datasetId].session = sessionId;
-        state.datasets[datasetId].index = k;
-        state.datasets[datasetId].previousDataset =
-          k > 0 ? session.datasets[k - 1]._id : null;
-        state.datasets[datasetId].nextDataset =
-          k < session.datasets.length - 1
-            ? session.datasets[k + 1]._id
-            : null;
-        state.datasets[
-          datasetId
-        ].firstDatasetInPreviousSession = firstInPrev;
+        state.sessionDatasets[localSessionId].push(datasetId);
+        state.datasets[datasetId] = dataset;
       }
-      firstInPrev = session.datasets[0]._id;
     }
   },
   actions: {
@@ -255,7 +252,8 @@ const store = new Vuex.Store({
           id: experimentId,
           folderId: experimentId,
           name: experiment.name,
-          index: i
+          index: i,
+          local: false
         };
 
         let sessions = experiment.sessions.sort(
@@ -277,7 +275,7 @@ const store = new Vuex.Store({
             numDatasets: session.datasets.length,
             cumulativeRange: [Number.MAX_VALUE, -Number.MAX_VALUE], // [null, null],
             experiment: experimentId,
-            local: false,
+            local: false
           };
 
           state.sessionDatasets[sessionId] = [];
@@ -287,9 +285,15 @@ const store = new Vuex.Store({
             let datasetId = dataset._id;
 
             state.sessionDatasets[sessionId].push(datasetId);
-            state.datasets[datasetId] = Object.assign({}, dataset);
-            state.datasets[datasetId].session = sessionId;
-            state.datasets[datasetId].index = k;
+            state.datasets[datasetId] = Object.assign(
+              {
+                session: sessionId,
+                index: k,
+                local: false
+              },
+              dataset
+            );
+
             state.datasets[datasetId].previousDataset =
               k > 0 ? session.datasets[k - 1]._id : null;
             state.datasets[datasetId].nextDataset =
@@ -384,7 +388,7 @@ const store = new Vuex.Store({
         if (datasetCache.has(dataset._id)) {
           imageData = datasetCache.get(dataset._id).imageData;
         } else {
-          const result = await loadFileAndGetData(dataset._id);
+          const result = await loadFileAndGetData(dataset);
           imageData = result.imageData;
         }
         sourceProxy.setInputData(imageData);
@@ -441,7 +445,8 @@ function checkLoadExperiment(oldValue, newValue) {
   newExperimentSessions.forEach(sessionId => {
     const sessionDatasets = store.state.sessionDatasets[sessionId];
     sessionDatasets.forEach(datasetId => {
-      readDataQueue.push({ id: datasetId });
+      const dataset = store.state.datasets[datasetId];
+      readDataQueue.push({ id: datasetId, local: dataset.local });
     });
   });
   startReaderWorkerPool();
@@ -468,15 +473,27 @@ function shrinkProxyManager(proxyManager) {
   });
 }
 
-function loadFile(id) {
+function loadFile(dataset) {
+  const id = dataset._id;
+
   if (fileCache.has(id)) {
     return { id, fileP: fileCache.get(id) };
   }
-  let p = ReaderFactory.downloadDataset(
-    girder.rest,
-    "nifti.nii.gz",
-    `/item/${id}/download`
-  );
+
+  let p = null;
+
+  if (dataset.local) {
+    p = new Promise(resolve => {
+      resolve(dataset.file);
+    });
+  } else {
+    p = ReaderFactory.downloadDataset(
+      girder.rest,
+      "nifti.nii.gz",
+      `/item/${id}/download`
+    );
+  }
+
   fileCache.set(id, p);
   return { id, fileP: p };
 }
@@ -517,8 +534,9 @@ function getData(id, file, webWorker = null) {
   });
 }
 
-function loadFileAndGetData(id) {
-  return loadFile(id).fileP.then(file => {
+function loadFileAndGetData(dataset) {
+  const id = dataset._id;
+  return loadFile(dataset).fileP.then(file => {
     return getData(id, file, savedWorker)
       .then(({ webWorker, imageData }) => {
         savedWorker = webWorker;
@@ -547,12 +565,17 @@ function getArrayName(filename) {
 
 function poolFunction(webWorker, taskInfo) {
   return new Promise((resolve, reject) => {
-    const { id } = taskInfo;
+    const { id, local } = taskInfo;
 
     let filePromise = null;
 
     if (fileCache.has(id)) {
       filePromise = fileCache.get(id);
+    } else if (local) {
+      // get file from store.state.datasets[id]
+      filePromise = new Promise(resolve => {
+        resolve(store.state.datasets[id].file);
+      });
     } else {
       filePromise = ReaderFactory.downloadDataset(
         girder.rest,

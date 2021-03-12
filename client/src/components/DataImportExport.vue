@@ -13,18 +13,18 @@ export default {
     loadDialog: false,
     loading: false,
     loadFiles: [],
-    localExperimentId: '',
-    localScanId: '',
-    localScanType: '',
+    localExperimentId: "",
+    localScanId: "",
+    localScanType: "",
     knownScanTypes: [
-      'dti30b400-v1',
-      'grefieldmap-v1',
-      'grefieldmap-v1',
-      'rsfmri-v1',
-      't2fse-v1',
-      'mprage-v1',
-      'dti6b500pepolar-v1',
-      'dti60b1000-v1'
+      "dti30b400",
+      "grefieldmap",
+      "grefieldmap",
+      "rsfmri",
+      "t2fse",
+      "mprage",
+      "dti6b500pepolar",
+      "dti60b1001"
     ]
   }),
   async created() {
@@ -58,7 +58,7 @@ export default {
       this.importDialog = false;
     },
     async loadData() {
-      this.loadFiles.forEach((file) => {
+      this.loadFiles.forEach(file => {
         console.log(`  ${file.name}`);
       });
 
@@ -66,10 +66,12 @@ export default {
         files: this.loadFiles.map(f => f),
         experimentId: this.localExperimentId,
         scanId: this.localScanId,
-        scanType: this.localScanType,
+        scanType: this.localScanType
       };
 
       this.addLocalScan(localScanData);
+
+      this.loadDialog = false;
     },
     async exportData() {
       await this.girderRest.get("miqa/data/export");
@@ -96,14 +98,11 @@ export default {
       text
       color="primary"
       @click="loadDialog = true"
-      :disabled="!importEnabled">
+      :disabled="!importEnabled"
+    >
       Load
     </v-btn>
-    <v-btn
-      text
-      color="primary"
-      @click="exportData"
-      :disabled="!exportEnabled"
+    <v-btn text color="primary" @click="exportData" :disabled="!exportEnabled"
       >Export</v-btn
     >
     <v-dialog v-model="importDialog" width="500" :persistent="importing">
@@ -126,7 +125,7 @@ export default {
         </v-card-actions>
       </v-card>
     </v-dialog>
-    <v-dialog v-model="loadDialog" width="500" :persistent="loading">
+    <v-dialog v-model="loadDialog" width="500">
       <v-card>
         <v-card-title class="title">
           Load a scan
@@ -135,34 +134,45 @@ export default {
           <v-container>
             <v-row>
               <v-col cols="12">
-                <v-file-input v-model="loadFiles" chips multiple label="Image files"></v-file-input>
+                <v-file-input
+                  v-model="loadFiles"
+                  chips
+                  multiple
+                  label="Image files"
+                ></v-file-input>
               </v-col>
             </v-row>
             <v-row>
               <v-col cols="12">
-                <v-text-field v-model="localExperimentId" label="Experiment ID"></v-text-field>
+                <v-text-field
+                  v-model="localExperimentId"
+                  label="Experiment ID"
+                ></v-text-field>
               </v-col>
             </v-row>
             <v-row>
               <v-col cols="12">
-                <v-text-field v-model="localScanId" label="Scan ID"></v-text-field>
+                <v-text-field
+                  v-model="localScanId"
+                  label="Scan ID"
+                ></v-text-field>
               </v-col>
             </v-row>
             <v-row>
               <v-col cols="12">
-                <v-select v-model="localScanType" :items="knownScanTypes" label="Scan Type"></v-select>
+                <v-select
+                  v-model="localScanType"
+                  :items="knownScanTypes"
+                  label="Scan Type"
+                ></v-select>
               </v-col>
             </v-row>
           </v-container>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn text @click="loadDialog = false" :disabled="loading"
-            >Cancel</v-btn
-          >
-          <v-btn text color="primary" @click="loadData" :loading="loading"
-            >Load</v-btn
-          >
+          <v-btn text @click="loadDialog = false">Cancel</v-btn>
+          <v-btn text color="primary" @click="loadData">Load</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
